@@ -1,0 +1,10 @@
+# project vezba07_kernel_utils configured on Thu Dec 21 07:09:53 2023 by
+# waf 2.0.20 (abi 20, python 30b06f0 on linux)
+# using ./waf configure
+#
+----------------------------------------
+Setting top to
+/home/stefan/Downloads/PWM/vezba07/vezba07_kernel_utils
+----------------------------------------
+Setting out to
+/home/stefan/Downloads/PWM/vezba07/vezba07_kernel_utils/build
