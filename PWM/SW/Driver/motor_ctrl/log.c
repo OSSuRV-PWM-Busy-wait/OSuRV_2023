@@ -14,36 +14,38 @@
 
 #define N_ENTRIES 1000
 #define BUFFER_SIZE 256
-
-typedef struct {
-    u64  t;
-    // flags.
-    u8 state;
-    u8 late;
-} log_entry_t;
-
-static u32 entry_index = 0;
-static log_entry_t log_entries[N_ENTRIES];
+static u16 write_index = 0;
+static log_entry_t log_entries[N_ENTRIES] = {0};
+static ktime_t ns_time = 0;
 
 static struct proc_dir_entry *proc_file;
 
-static ssize_t read_proc(struct file *filp, char __user *buffer, size_t length, loff_t *ppos)
+
+void log__add(u64 t, u8 state, u8 late) {
+    log_entries[write_index].t = ns_time - t;
+    log_entries[write_index].state = state;
+    log_entries[write_index].late = late;
+    write_index = (write_index + 1) % N_ENTRIES;
+}
+
+
+static ssize_t read_proc(struct file *filp, char __user *user_buffer, size_t length, loff_t *ppos)
 {
-    char buf[BUFFER_SIZE];
+    char output_buffer[BUFFER_SIZE] = {'\0'};
     int len = 0;
+    static int i = 0;
 
-    printk(KERN_INFO DEV_NAME": read_proc handler");
-
-    if(*ppos > 0 || length < BUFFER_SIZE) {
+    if(i >= N_ENTRIES) {
+        i = 0;
         return 0;
     }
+    
+    len += sprintf(output_buffer, "t %llu\nstate %d\nlate %d\n", log_entries[i].t/1000000000, log_entries[i].state, log_entries[i].late);
+    i++;
 
-    len += sprintf(buf, "test\n");
-    if(copy_to_user(buffer, buf, len)) {
+    if(copy_to_user(user_buffer, output_buffer, len)) {
         return -EFAULT;
     }
-
-    *ppos = len;
 
     return len;
 }
@@ -61,7 +63,8 @@ int log__init(void) {
         return -1;
     }
 
-    printk(KERN_INFO DEV_NAME": Created proc entry.");
+    ns_time = ktime_get_ns();
+    printk(KERN_INFO DEV_NAME": Created proc entry. Time: %lld", ns_time);
     return 0;
 }
 

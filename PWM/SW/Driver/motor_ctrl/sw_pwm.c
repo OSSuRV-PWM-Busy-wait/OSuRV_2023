@@ -9,6 +9,7 @@
 
 #include <linux/ktime.h> // ktime_t...
 #include <linux/hrtimer.h> // hrtimer...
+#include "log.h"
 
 
 static const uint8_t ch_2_gpio_no[SW_PWM__N_CH] = {
@@ -58,6 +59,7 @@ static enum hrtimer_restart timer_callback(struct hrtimer* p_timer) {
 		ps->off_interval = ps->off_interval_pending;
 		spin_unlock_irqrestore(&ps->interval_pending_lock, flags);
 	}
+    log__add(ktime_get_ns(), ps->on, 0);
 
 	return HRTIMER_RESTART;
 }
