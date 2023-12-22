@@ -40,7 +40,7 @@ static ssize_t read_proc(struct file *filp, char __user *user_buffer, size_t len
         return 0;
     }
     
-    len += sprintf(output_buffer, "t %llu\nstate %d\nlate %d\n", log_entries[i].t/1000000000, log_entries[i].state, log_entries[i].late);
+    len += sprintf(output_buffer, "t %llu\nstate %d\nlate %d\n", log_entries[i].t, log_entries[i].state, log_entries[i].late);
     i++;
 
     if(copy_to_user(user_buffer, output_buffer, len)) {
