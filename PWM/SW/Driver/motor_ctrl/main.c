@@ -168,11 +168,11 @@ static struct file_operations motor_ctrl_fops = {
 
 
 void motor_ctrl_exit(void) {
-	servo_fb__exit();
+	//servo_fb__exit();
 	bldc__exit();
 	pwm__exit();
-    log_exit();
-	gpio__exit();
+    log__exit();
+	//gpio__exit();
 	unregister_chrdev(DEV_MAJOR, DEV_NAME);
 	
 	printk(KERN_INFO DEV_NAME": Module removed.\n");
@@ -190,12 +190,11 @@ int motor_ctrl_init(void) {
 		goto exit;
 	}
 
+    /*
 	r = gpio__init();
-	if(r){
-		goto exit;
-	}
+    */
 
-    r = log_init();
+    r = log__init();
     if(r) {
         goto exit;
     }
@@ -210,16 +209,17 @@ int motor_ctrl_init(void) {
 		pwm__set_moduo(ch, 1000 << 1);
 		pwm__set_threshold(ch, DEFUALT_THRESHOLD << 1);
 	}
-	
 	r = bldc__init();
 	if(r){
 		goto exit;
 	}
-	
+
+    /*
 	r = servo_fb__init();
 	if(r){
 		goto exit;
 	}
+    */
 	
 exit:
 	if(r){

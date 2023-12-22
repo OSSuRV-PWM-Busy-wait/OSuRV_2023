@@ -8,9 +8,8 @@
 #include <linux/proc_fs.h>
 #include <asm/uaccess.h>
 
-static ssize_t read_proc(struct file *filp, char __user *buffer, size_t length, loff_t * offset);
-int log_init(void);
-void log_exit(void);
+int log__init(void);
+void log__exit(void);
 
 #endif
 
