@@ -22,7 +22,7 @@ static struct proc_dir_entry *proc_file;
 
 
 void log__add(u64 t, u8 state, u8 late) {
-    log_entries[write_index].t = ns_time - t;
+    log_entries[write_index].t = t - ns_time;
     log_entries[write_index].state = state;
     log_entries[write_index].late = late;
     write_index = (write_index + 1) % N_ENTRIES;
