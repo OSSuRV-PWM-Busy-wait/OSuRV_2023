@@ -14,12 +14,11 @@
 
 #define N_ENTRIES 1000
 #define BUFFER_SIZE 256
+
 static u16 write_index = 0;
-static log_entry_t log_entries[N_ENTRIES] = {0};
 static ktime_t ns_time = 0;
-
+static log_entry_t log_entries[N_ENTRIES] = {0};
 static struct proc_dir_entry *proc_file;
-
 
 void log__add(u64 t, u8 state, u8 late) {
     log_entries[write_index].t = t - ns_time;
@@ -27,7 +26,6 @@ void log__add(u64 t, u8 state, u8 late) {
     log_entries[write_index].late = late;
     write_index = (write_index + 1) % N_ENTRIES;
 }
-
 
 static ssize_t read_proc(struct file *filp, char __user *user_buffer, size_t length, loff_t *ppos)
 {
@@ -40,7 +38,7 @@ static ssize_t read_proc(struct file *filp, char __user *user_buffer, size_t len
         return 0;
     }
     
-    len += sprintf(output_buffer, "t %llu\nstate %d\nlate %d\n", log_entries[i].t, log_entries[i].state, log_entries[i].late);
+    len += sprintf(output_buffer, "%llu %d %d\n", log_entries[i].t, log_entries[i].state, log_entries[i].late);
     i++;
 
     if(copy_to_user(user_buffer, output_buffer, len)) {
@@ -49,7 +47,6 @@ static ssize_t read_proc(struct file *filp, char __user *user_buffer, size_t len
 
     return len;
 }
-
 
 static struct proc_ops proc_fops = {
     .proc_read = read_proc,
