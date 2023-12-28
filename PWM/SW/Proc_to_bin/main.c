@@ -6,13 +6,13 @@
 #include <time.h>
 #include <unistd.h>
 
-void main(int argc, char **argv) {
+int main(int argc, char **argv) {
     int i = 0;
     char filename[1000];
     char output[100];
     sprintf(filename, "/proc/motor_ctrl_log");
     FILE *input_file;
-    FILE *output_file = fopen("motor_ctrl_log.bin", "w");
+    FILE *output_file = fopen("motor_ctrl_log.txt", "w");
     //FILE *f = fopen()
 
     long long unsigned int time;
@@ -38,6 +38,7 @@ void main(int argc, char **argv) {
         fclose(input_file); //refresh file
         
     }
-    printf("STEVICA: %d", i);
+    printf("Amount of lines read: %d\n", i);
     fclose(output_file);
+	return 0;
 }
