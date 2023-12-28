@@ -16,6 +16,7 @@
 #define BUFFER_SIZE 256
 
 static u16 write_index = 0;
+static ktime_t last_log = 0;
 static ktime_t ns_time = 0;
 static log_entry_t log_entries[N_ENTRIES] = {0};
 static struct proc_dir_entry *proc_file;
@@ -25,6 +26,10 @@ void log__add(u64 t, u8 state, u8 late) {
     log_entries[write_index].state = state;
     log_entries[write_index].late = late;
     write_index = (write_index + 1) % N_ENTRIES;
+	if(write_index == 1000-1) {
+		printk(KERN_INFO DEV_NAME": Time to fill up log buffer: %llu ms", (ktime_get_ns() - last_log)/1000000);
+		last_log = ktime_get_ns();
+	}
 }
 
 static ssize_t read_proc(struct file *filp, char __user *user_buffer, size_t length, loff_t *ppos)
@@ -61,6 +66,7 @@ int log__init(void) {
     }
 
     ns_time = ktime_get_ns();
+	last_log = ktime_get_ns();
     printk(KERN_INFO DEV_NAME": Created proc entry. Time: %lld", ns_time);
     return 0;
 }
