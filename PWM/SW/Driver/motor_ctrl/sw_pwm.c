@@ -23,6 +23,7 @@ typedef struct {
 	struct hrtimer timer; // Must be first in struct.
 	uint8_t gpio_no;
 	bool on;
+	bool on_prev;
 	uint32_t moduo;
 	uint32_t threshold;
 	// TODO Maybe this kill performance and break PREEMPT_RT
@@ -36,15 +37,75 @@ typedef struct {
 } sw_pwm_t;
 static sw_pwm_t sw_pwms[SW_PWM__N_CH];
 
+bool rising_edge(sw_pwm_t pwm) //PWM RE
+{
+	if(!(pwm.on_prev) && pwm.on)
+	{
+		return true;
+	}
+	return 0;
+}
+
+bool am_i_late(ns_t supposed_time, ns_t my_time) //Checks if late
+{
+	return supposed_time < (my_time + 1000); //1us safety
+}
+
+ns_t next_event(sw_pwm_t *ps, ns_t t_now) // Calculating the next supposed event timestamp
+{
+	ns_t next = 0;
+	if(rising_edge())
+	{
+		//2x next??????? - kontam calculate_next_event_t * 2 ili mozda continue
+	}
+	else
+	{
+		//next
+	}
+	while(am_i_late())
+	{
+		//next
+	}
+	return next;
+}
+
+static struct task_struct* thread;
+int busy_pwm_loop(void* data) {
+	sw_pwm_t* ps;
+	ns_t t_now;
+	ns_t t_next;
+	while(!kthread_should_stop()){
+		t_now = ktime_get_ns();
+		t_next = ~(ns_t)0; //reinit
+		for(ch = 0; ch < SW_PWM__N_CH; ch++){
+			ps = &sw_pwms[ch];
+			//log__add(t_now, ps->on, am_i_late(t_next)); mozda ovde ali ne znam da li zelimo da logujemo za svaki pin u isti file
+
+		}
+
+		//calculate new next
+		t_next = next_event(ps, t_now);
+	}
+	
+	
+	do_exit(0);
+	
+	return 0;
+}
+
+
+
 static enum hrtimer_restart timer_callback(struct hrtimer* p_timer) {
 	//TODO sw_pwm_t* ps = container_of(p_timer, sw_pwm_t, timer);
 	sw_pwm_t* ps = (sw_pwm_t*)p_timer;
 	unsigned long flags;
 
+	//set prev state
+	ps->on_prev = ps->on;
+
 	if(!ps->on && !ps->down){
 		gpio__set(ps->gpio_no);
 		ps->on = 1;
-
 		hrtimer_forward_now(&ps->timer, ps->on_interval);
 	}else{
 		gpio__clear(ps->gpio_no);
@@ -112,7 +173,16 @@ int sw_pwm__init(void) {
 			ps->off_interval,
 			HRTIMER_MODE_REL_PINNED_HARD
 		);
-	}
+
+		thread = kthread_create(busy_pwm_loop, 0, "busy_pwm_loop");
+		if(thread){
+			kthread_bind(thread, 0);
+			wake_up_process(thread);
+		}else{
+			r = -EFAULT;
+			goto exit;
+		}
+		}
 
 	return 0;
 }
