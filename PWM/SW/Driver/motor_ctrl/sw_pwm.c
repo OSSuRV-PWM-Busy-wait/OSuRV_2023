@@ -36,7 +36,7 @@ typedef struct {
 	ktime_t off_interval;
 } sw_pwm_t;
 static sw_pwm_t sw_pwms[SW_PWM__N_CH];
-
+/*
 bool rising_edge(sw_pwm_t pwm) //PWM RE
 {
 	if(!(pwm.on_prev) && pwm.on)
@@ -93,7 +93,7 @@ int busy_pwm_loop(void* data) {
 	return 0;
 }
 
-
+*/
 
 static enum hrtimer_restart timer_callback(struct hrtimer* p_timer) {
 	//TODO sw_pwm_t* ps = container_of(p_timer, sw_pwm_t, timer);
@@ -173,7 +173,7 @@ int sw_pwm__init(void) {
 			ps->off_interval,
 			HRTIMER_MODE_REL_PINNED_HARD
 		);
-
+		/*
 		thread = kthread_create(busy_pwm_loop, 0, "busy_pwm_loop");
 		if(thread){
 			kthread_bind(thread, 0);
@@ -181,8 +181,8 @@ int sw_pwm__init(void) {
 		}else{
 			r = -EFAULT;
 			goto exit;
-		}
-		}
+		}*/
+	}
 
 	return 0;
 }

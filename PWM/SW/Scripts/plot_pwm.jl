@@ -16,9 +16,8 @@ open("/proc/motor_ctrl_log") do io
     end
 end
 
-print("\noutput = ",numbers)
-
-close(file)
+print("\noutput = ",states)
 
 
-plot(timestamps, states, label="PWM Signal", linewidth=2)
+plotlyjs()
+plot(states, label="PWM Signal", linewidth=2, show=true)
