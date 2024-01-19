@@ -1,204 +1,181 @@
 
 #include "sw_pwm.h"
-#include "include/motor_ctrl.h"
-#include "gpio.h"
 
+#include "gpio.h"
+#include "include/motor_ctrl.h" // DEV_NAME
+#include "log.h"
 #include <asm/io.h> // ioremap(), iounmap()
 #include <linux/delay.h> // mdelay()
 #include <linux/errno.h> // ENOMEM
+#include <linux/kthread.h> // kthread stuff
 
-#include <linux/ktime.h> // ktime_t...
-#include <linux/hrtimer.h> // hrtimer...
-#include "log.h"
-
-
-static const uint8_t ch_2_gpio_no[SW_PWM__N_CH] = {
+static const uint8_t pins[SW_PWM__N_CH] = {
 	16,
 	19,
 	20,
 	26
 };
 
+typedef u64 ns_t;
+
 typedef struct {
-	struct hrtimer timer; // Must be first in struct.
-	uint8_t gpio_no;
+	uint8_t pin;
 	bool on;
-	bool on_prev;
 	uint32_t moduo;
 	uint32_t threshold;
 	// TODO Maybe this kill performance and break PREEMPT_RT
-	spinlock_t interval_pending_lock;
-	bool down_pending;
-	ktime_t on_interval_pending;
-	ktime_t off_interval_pending;
-	bool down;
-	ktime_t on_interval;
-	ktime_t off_interval;
+	spinlock_t d_pending_lock;
+	ns_t d_on_pending;
+	ns_t d_off_pending;
+	ns_t d_on;
+	ns_t d_off;
+	ns_t t_event;
 } sw_pwm_t;
 static sw_pwm_t sw_pwms[SW_PWM__N_CH];
-/*
-bool rising_edge(sw_pwm_t pwm) //PWM RE
-{
-	if(!(pwm.on_prev) && pwm.on)
-	{
-		return true;
-	}
-	return 0;
-}
 
-bool am_i_late(ns_t supposed_time, ns_t my_time) //Checks if late
-{
-	return supposed_time < (my_time + 1000); //1us safety
-}
-
-ns_t next_event(sw_pwm_t *ps, ns_t t_now) // Calculating the next supposed event timestamp
-{
-	ns_t next = 0;
-	if(rising_edge())
-	{
-		//2x next??????? - kontam calculate_next_event_t * 2 ili mozda continue
-	}
-	else
-	{
-		//next
-	}
-	while(am_i_late())
-	{
-		//next
-	}
-	return next;
-}
+//TODO ns_to_ticks();
 
 static struct task_struct* thread;
 int busy_pwm_loop(void* data) {
+	uint8_t ch;
 	sw_pwm_t* ps;
+	unsigned long flags;
 	ns_t t_now;
 	ns_t t_next;
+	ns_t d_sleep;
+	(void) data;
+	ns_t diff = 0;
+
+
 	while(!kthread_should_stop()){
 		t_now = ktime_get_ns();
-		t_next = ~(ns_t)0; //reinit
+
+		//FIXME If we late, we need recovery.
+		//FIXME cannot change duty.
+		//if(d < 10){ printk(KERN_WARNING DEV_NAME": d = %d\n", ++d); }
+		//if(d < 10){ printk(KERN_WARNING DEV_NAME": ps->t_event = %lld\n", ps->t_event); }
+		t_next = ~(ns_t)0; // type max.
 		for(ch = 0; ch < SW_PWM__N_CH; ch++){
 			ps = &sw_pwms[ch];
-			//log__add(t_now, ps->on, am_i_late(t_next)); mozda ovde ali ne znam da li zelimo da logujemo za svaki pin u isti file
+			if(ps->t_event <= t_now) {
+				ps->on = !ps->on;
+				if(ps->on){
+					//gpio__set(ps->pin);
 
+					// Changing interval at the end of period.
+					spin_lock_irqsave(&ps->d_pending_lock, flags);
+					ps->d_on = ps->d_on_pending;
+					ps->d_off = ps->d_off_pending;
+					spin_unlock_irqrestore(&ps->d_pending_lock, flags);
+
+					ps->t_event += ps->d_on;
+				}else{
+					//gpio__clear(ps->pin);
+
+					ps->t_event += ps->d_off;
+				}
+			}
+
+			if(ps->t_event < t_next){
+				t_next = ps->t_event;
+			}
+			if(ch == 0) {
+				diff = (t_now >= ps->t_event) ? t_now - ps->t_event : ps->t_event - t_now;
+				log__add(diff, ps->on);
+			}
 		}
-
-		//calculate new next
-		t_next = next_event(ps, t_now);
+		
+		if(t_next > (t_now + 1000)){
+			d_sleep = t_next - (t_now + 1000); // 1us safety.
+			if(d_sleep > 1000){
+				ndelay(d_sleep);
+			}
+		}
 	}
-	
-	
-	do_exit(0);
-	
+
+
 	return 0;
-}
-
-*/
-
-static enum hrtimer_restart timer_callback(struct hrtimer* p_timer) {
-	//TODO sw_pwm_t* ps = container_of(p_timer, sw_pwm_t, timer);
-	sw_pwm_t* ps = (sw_pwm_t*)p_timer;
-	unsigned long flags;
-
-	//set prev state
-	ps->on_prev = ps->on;
-
-	if(!ps->on && !ps->down){
-		gpio__set(ps->gpio_no);
-		ps->on = 1;
-		hrtimer_forward_now(&ps->timer, ps->on_interval);
-	}else{
-		gpio__clear(ps->gpio_no);
-		ps->on = 0;
-		
-		hrtimer_forward_now(&ps->timer, ps->off_interval);
-		
-		// Changing interval at the end of period.
-		spin_lock_irqsave(&ps->interval_pending_lock, flags);
-		ps->down = ps->down_pending;
-		ps->on_interval = ps->on_interval_pending;
-		ps->off_interval = ps->off_interval_pending;
-		spin_unlock_irqrestore(&ps->interval_pending_lock, flags);
-	}
-    log__add(ktime_get_ns(), ps->on, 0);
-
-	return HRTIMER_RESTART;
 }
 
 static void set_intervals(sw_pwm_t* ps) {
 	unsigned long flags;
 
-	bool down = ps->threshold == 0;
 	// 10000 stands for 10 us.
-	ktime_t on = ktime_set(0, (ps->threshold)*10000);
-	ktime_t off = ktime_set(0, (ps->moduo - ps->threshold)*10000);
+	ns_t on  = (ns_t)10000*ps->threshold;
+	ns_t off = (ns_t)10000*(ps->moduo - ps->threshold);
 
-	spin_lock_irqsave(&ps->interval_pending_lock, flags);
-	ps->down_pending = down;
-	ps->on_interval_pending = on;
-	ps->off_interval_pending = off;
-	spin_unlock_irqrestore(&ps->interval_pending_lock, flags);
+	spin_lock_irqsave(&ps->d_pending_lock, flags);
+	ps->d_on_pending = on;
+	ps->d_off_pending = off;
+	spin_unlock_irqrestore(&ps->d_pending_lock, flags);
 }
 
 int sw_pwm__init(void) {
+	int r = 0;
+	ns_t t_now;
 	uint8_t ch;
 	sw_pwm_t* ps;
 
+	t_now = ktime_get_ns();
+	printk(KERN_WARNING DEV_NAME": t_now = %lld\n", t_now);
 	for(ch = 0; ch < SW_PWM__N_CH; ch++){
 		ps = &sw_pwms[ch];
 
-		ps->gpio_no = ch_2_gpio_no[ch];
-		gpio__clear(ps->gpio_no);
-		gpio__steer_pinmux(ps->gpio_no, GPIO__OUT);
+		ps->pin = pins[ch];
+		//gpio__clear(ps->pin);
+		//gpio__steer_pinmux(ps->pin, GPIO__OUT);
 
-		ps->on = true;
+		ps->on = false;
 
-		spin_lock_init(&ps->interval_pending_lock);
+		spin_lock_init(&ps->d_pending_lock);
 
 		ps->moduo = 1000;
 		ps->threshold = 0;
+		ps->moduo = 1000<<1;
+		ps->threshold = 75<<1;
 		set_intervals(ps);
-		ps->down = ps->down_pending;
-		ps->on_interval = ps->on_interval_pending;
-		ps->off_interval = ps->off_interval_pending;
+		ps->d_on = ps->d_on_pending;
+		ps->d_off = ps->d_off_pending;
 
-		hrtimer_init(
-			&ps->timer,
-			CLOCK_MONOTONIC,
-			HRTIMER_MODE_REL_PINNED_HARD
-		);
-		ps->timer.function = &timer_callback;
-		hrtimer_start(
-			&ps->timer,
-			ps->off_interval,
-			HRTIMER_MODE_REL_PINNED_HARD
-		);
-		/*
-		thread = kthread_create(busy_pwm_loop, 0, "busy_pwm_loop");
-		if(thread){
-			kthread_bind(thread, 0);
-			wake_up_process(thread);
-		}else{
-			r = -EFAULT;
-			goto exit;
-		}*/
+		// First cycle will be 0% of PWM.
+		ps->t_event = t_now + ps->d_on + ps->d_off;
+		printk(KERN_WARNING DEV_NAME": ps->t_event = %lld\n", ps->t_event);
 	}
 
-	return 0;
+	thread = kthread_create(busy_pwm_loop, 0, "busy_pwm_loop");
+	if(thread){
+		kthread_bind(thread, 0);
+		wake_up_process(thread);
+	}else{
+		r = -EFAULT;
+		goto exit;
+	}
+
+exit:
+	if(r){
+		printk(KERN_ERR DEV_NAME": %s() failed with %d!\n", __func__, r);
+		sw_pwm__exit();
+	}
+	return r;
 }
 
 void sw_pwm__exit(void) {
 	uint8_t ch;
 	sw_pwm_t* ps;
 
+	if(thread){
+		// Stop thread.
+		kthread_stop(thread);
+	}
+
 	for(ch = 0; ch < SW_PWM__N_CH; ch++){
 		ps = &sw_pwms[ch];
 
-		hrtimer_cancel(&ps->timer);
-
-		gpio__clear(ps->gpio_no);
-		gpio__steer_pinmux(ps->gpio_no, GPIO__IN);
+		gpio__clear(ps->pin);
+		gpio__steer_pinmux(ps->pin, GPIO__IN);
 	}
+
+	//TODO Log lating and stuff.
 }
 
 

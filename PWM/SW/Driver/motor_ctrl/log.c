@@ -21,15 +21,20 @@ static ktime_t ns_time = 0;
 static log_entry_t log_entries[N_ENTRIES] = {0};
 static struct proc_dir_entry *proc_file;
 
-void log__add(u64 t, u8 state, u8 late) {
-    log_entries[write_index].t = t - ns_time;
+/*
+ * @t - vreme
+ * @state - state
+ */
+void log__add(u64 t, u8 state) {
+    log_entries[write_index].t = t;
     log_entries[write_index].state = state;
-    log_entries[write_index].late = late;
+	
     write_index = (write_index + 1) % N_ENTRIES;
-	if(write_index == 1000-1) {
+	/*if(write_index == 1000-1) {
 		printk(KERN_INFO DEV_NAME": Time to fill up log buffer: %llu ms", (ktime_get_ns() - last_log)/1000000);
 		last_log = ktime_get_ns();
 	}
+	*/
 }
 
 static ssize_t read_proc(struct file *filp, char __user *user_buffer, size_t length, loff_t *ppos)
@@ -43,7 +48,7 @@ static ssize_t read_proc(struct file *filp, char __user *user_buffer, size_t len
         return 0;
     }
     
-    len += sprintf(output_buffer, "%llu %d %d\n", log_entries[i].t, log_entries[i].state, log_entries[i].late);
+    len += sprintf(output_buffer, "%llu %d \n", log_entries[i].t, log_entries[i].state);
     i++;
 
     if(copy_to_user(user_buffer, output_buffer, len)) {
@@ -76,36 +81,4 @@ void log__exit(void) {
     printk(KERN_INFO DEV_NAME": Removed proc entry.");
 }
 
-/*
-   void log_add(ns_t t, u8 state, u8 late) {
-   log_entries[last_entry].t = t;
-   log_entries[last_entry].state = state;
-   log_entries[last_entry].late = late;
-   last_entry++;
-   }
-   */
 
-/*
-   size_t print_ns_t(const char* buf, ns_t t) {
-//TODO %ds%3dm%3du%3dn
-//snprintf
-}
-
-#define TICKS_NS 100000
-u32 ns_t_2_ticks(ns_t t) {
-return t/TICKS_NS
-}
-
-size_t print_ns_t_and_ticks(const char* buf, ns_t t) {
-u32 ticks = ns_t_2_ticks(t);
-print_ns_t(buf,
-}
-
-void log_print() {
-// ns_t and ticks
-// rel abs from start
-//	rel to prev
-// state
-// late
-}
-*/
