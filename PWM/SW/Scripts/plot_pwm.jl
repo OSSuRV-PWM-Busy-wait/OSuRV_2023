@@ -1,23 +1,22 @@
 using Plots
 
-timestamps = []
-states = [] 
-lates = []
-
+jitters = []
+states = []
+channels = []
 
 ###read
 open("/proc/motor_ctrl_log") do io
     while !eof(io)
         line = readline(io)
-        timestamp, state, late = split(line, " ")
-        append!(timestamps, parse(Int, timestamp) / 2000000)
+        jitter, state, channel = split(line, " ")
+        append!(jitters, parse(Int, jitter))
         append!(states, parse(Int, state))
-        append!(lates, parse(Int, late))
+        append!(channels, parse(Int, channel))
     end
 end
 
-print("\noutput = ",states)
+print("\noutput = ", jitters)
 
-
+jitters = jitters
 plotlyjs()
-plot(states, label="PWM Signal", linewidth=2, show=true)
+plot(jitters, label="Jitter", linewidth=2, show=true)
