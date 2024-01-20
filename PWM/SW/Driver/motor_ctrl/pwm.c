@@ -10,12 +10,12 @@
 int pwm__init(void) {
 	int r;
 
-	/*
+	/*	
 	r = hw_pwm__init();
 	if(r){
 		goto exit;
 	}
-	*/
+	*/	
 	
 	r = sw_pwm__init();
 	if(r){
@@ -31,7 +31,7 @@ exit:
 
 void pwm__exit(void) {
 	sw_pwm__exit();
-	hw_pwm__exit();
+	//hw_pwm__exit();
 }
 
 

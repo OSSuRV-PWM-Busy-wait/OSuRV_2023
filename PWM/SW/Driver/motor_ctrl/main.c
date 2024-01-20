@@ -169,7 +169,7 @@ static struct file_operations motor_ctrl_fops = {
 
 void motor_ctrl_exit(void) {
 	//servo_fb__exit();
-	bldc__exit();
+	//bldc__exit();
 	pwm__exit();
     log__exit();
 	//gpio__exit();
@@ -191,8 +191,10 @@ int motor_ctrl_init(void) {
 	}
 
     
-	r = gpio__init();
-    
+	/*r = gpio__init();
+	if(r) {
+		goto exit;
+	}*/
 
     r = log__init();
     if(r) {
