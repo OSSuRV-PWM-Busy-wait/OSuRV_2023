@@ -33,7 +33,9 @@ typedef struct {
 } sw_pwm_t;
 static sw_pwm_t sw_pwms[SW_PWM__N_CH];
 
-//TODO ns_to_ticks();
+//TODO ns_to_tijks();
+#define TOLERANCE 500000 // 0.5ms
+#define SCALE 1000000
 
 static struct task_struct* thread;
 int busy_pwm_loop(void* data) {
@@ -44,24 +46,23 @@ int busy_pwm_loop(void* data) {
 	ns_t t_next;
 	ns_t d_sleep;
 	(void) data;
-	ns_t diff = 0;
-
+	ns_t diff;
 
 	while(!kthread_should_stop()){
 		t_now = ktime_get_ns();
 
 		//FIXME If we late, we need recovery.
 		//FIXME cannot change duty.
-		//if(d < 10){ printk(KERN_WARNING DEV_NAME": d = %d\n", ++d); }
-		//if(d < 10){ printk(KERN_WARNING DEV_NAME": ps->t_event = %lld\n", ps->t_event); }
 		t_next = ~(ns_t)0; // type max.
 		for(ch = 0; ch < SW_PWM__N_CH; ch++){
 			ps = &sw_pwms[ch];
-			if(ps->t_event <= t_now) {
+
+			diff = (t_now >= ps->t_event) ? t_now - ps->t_event : ps->t_event - t_now;
+			if(diff <= TOLERANCE) {
+			//if(ps->t_event <= t_now) {
 				ps->on = !ps->on;
 				if(ps->on){
 					//gpio__set(ps->pin);
-
 					// Changing interval at the end of period.
 					spin_lock_irqsave(&ps->d_pending_lock, flags);
 					ps->d_on = ps->d_on_pending;
@@ -71,22 +72,30 @@ int busy_pwm_loop(void* data) {
 					ps->t_event += ps->d_on;
 				}else{
 					//gpio__clear(ps->pin);
-
 					ps->t_event += ps->d_off;
 				}
+			} else {
+				ps->t_event += diff;
 			}
 
 			if(ps->t_event < t_next){
 				t_next = ps->t_event;
 			}
+
 			if(ch == 0) {
-				diff = (t_now >= ps->t_event) ? t_now - ps->t_event : ps->t_event - t_now;
+				if(diff <= TOLERANCE) 
+					printk(KERN_INFO DEV_NAME": diff: %llu t_now: %llu t_next: %llu", diff, ktime_get_ns()/SCALE, t_next/SCALE);
+				else 
+					printk(KERN_ALERT DEV_NAME": diff: %llu t_now: %llu t_next: %llu", diff, ktime_get_ns()/SCALE, t_next/SCALE);
 				log__add(diff, ps->on);
 			}
+
+
 		}
 		
 		if(t_next > (t_now + 1000)){
 			d_sleep = t_next - (t_now + 1000); // 1us safety.
+			printk(KERN_INFO DEV_NAME": sleeping for %llu", d_sleep);
 			if(d_sleep > 1000){
 				ndelay(d_sleep);
 			}

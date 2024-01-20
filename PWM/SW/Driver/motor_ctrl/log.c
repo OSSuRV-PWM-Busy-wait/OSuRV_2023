@@ -26,59 +26,54 @@ static struct proc_dir_entry *proc_file;
  * @state - state
  */
 void log__add(u64 t, u8 state) {
-    log_entries[write_index].t = t;
-    log_entries[write_index].state = state;
-	
-    write_index = (write_index + 1) % N_ENTRIES;
-	/*if(write_index == 1000-1) {
-		printk(KERN_INFO DEV_NAME": Time to fill up log buffer: %llu ms", (ktime_get_ns() - last_log)/1000000);
-		last_log = ktime_get_ns();
-	}
-	*/
+	log_entries[write_index].t = t;
+	log_entries[write_index].state = state;
+
+	write_index = (write_index + 1) % N_ENTRIES;
 }
 
 static ssize_t read_proc(struct file *filp, char __user *user_buffer, size_t length, loff_t *ppos)
 {
-    char output_buffer[BUFFER_SIZE] = {'\0'};
-    int len = 0;
-    static int i = 0;
+	char output_buffer[BUFFER_SIZE] = {'\0'};
+	int len = 0;
+	static int i = 0;
 
-    if(i >= N_ENTRIES) {
-        i = 0;
-        return 0;
-    }
-    
-    len += sprintf(output_buffer, "%llu %d \n", log_entries[i].t, log_entries[i].state);
-    i++;
+	if(i >= N_ENTRIES) {
+		i = 0;
+		return 0;
+	}
 
-    if(copy_to_user(user_buffer, output_buffer, len)) {
-        return -EFAULT;
-    }
+	len += sprintf(output_buffer, "%llu %d \n", log_entries[i].t, log_entries[i].state);
+	i++;
 
-    return len;
+	if(copy_to_user(user_buffer, output_buffer, len)) {
+		return -EFAULT;
+	}
+
+	return len;
 }
 
 static struct proc_ops proc_fops = {
-    .proc_read = read_proc,
+	.proc_read = read_proc,
 };
 
 int log__init(void) {
-    proc_file = proc_create("motor_ctrl_log", 0555, NULL, &proc_fops);
+	proc_file = proc_create("motor_ctrl_log", 0555, NULL, &proc_fops);
 
-    if(proc_file == NULL) {
-        printk(KERN_WARNING DEV_NAME": Could not create proc entry.");
-        return -1;
-    }
+	if(proc_file == NULL) {
+		printk(KERN_WARNING DEV_NAME": Could not create proc entry.");
+		return -1;
+	}
 
-    ns_time = ktime_get_ns();
+	ns_time = ktime_get_ns();
 	last_log = ktime_get_ns();
-    printk(KERN_INFO DEV_NAME": Created proc entry. Time: %lld", ns_time);
-    return 0;
+	printk(KERN_INFO DEV_NAME": Created proc entry. Time: %lld", ns_time);
+	return 0;
 }
 
 void log__exit(void) {
-    proc_remove(proc_file);
-    printk(KERN_INFO DEV_NAME": Removed proc entry.");
+	proc_remove(proc_file);
+	printk(KERN_INFO DEV_NAME": Removed proc entry.");
 }
 
 
