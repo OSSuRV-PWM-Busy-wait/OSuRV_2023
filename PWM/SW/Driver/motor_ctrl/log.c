@@ -16,8 +16,6 @@
 #define BUFFER_SIZE 256
 
 static u16 write_index = 0;
-static ktime_t last_log = 0;
-static ktime_t ns_time = 0;
 static log_entry_t log_entries[N_ENTRIES] = {0};
 static struct proc_dir_entry *proc_file;
 
@@ -25,9 +23,10 @@ static struct proc_dir_entry *proc_file;
  * @t - vreme
  * @state - state
  */
-void log__add(u64 t, u8 state) {
+void log__add(int64_t t, u8 state, u8 ch) {
 	log_entries[write_index].t = t;
 	log_entries[write_index].state = state;
+	log_entries[write_index].ch = ch;
 
 	write_index = (write_index + 1) % N_ENTRIES;
 }
@@ -43,7 +42,7 @@ static ssize_t read_proc(struct file *filp, char __user *user_buffer, size_t len
 		return 0;
 	}
 
-	len += sprintf(output_buffer, "%llu %d \n", log_entries[i].t, log_entries[i].state);
+	len += sprintf(output_buffer, "%lld %d %d\n", log_entries[i].t, log_entries[i].state, log_entries[i].ch);
 	i++;
 
 	if(copy_to_user(user_buffer, output_buffer, len)) {
@@ -65,9 +64,6 @@ int log__init(void) {
 		return -1;
 	}
 
-	ns_time = ktime_get_ns();
-	last_log = ktime_get_ns();
-	printk(KERN_INFO DEV_NAME": Created proc entry. Time: %lld", ns_time);
 	return 0;
 }
 

@@ -190,9 +190,9 @@ int motor_ctrl_init(void) {
 		goto exit;
 	}
 
-    /*
+    
 	r = gpio__init();
-    */
+    
 
     r = log__init();
     if(r) {
@@ -209,17 +209,20 @@ int motor_ctrl_init(void) {
 		pwm__set_moduo(ch, 1000 << 1);
 		pwm__set_threshold(ch, DEFUALT_THRESHOLD << 1);
 	}
+	/*
 	r = bldc__init();
 	if(r){
 		goto exit;
 	}
+	*/
 
-    /*
+   	/* 
 	r = servo_fb__init();
 	if(r){
 		goto exit;
 	}
-    */
+	*/
+    
 	
 exit:
 	if(r){

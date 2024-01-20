@@ -47,6 +47,7 @@ int busy_pwm_loop(void* data) {
 	ns_t d_sleep;
 	(void) data;
 	ns_t diff;
+	int64_t log_diff;
 
 	while(!kthread_should_stop()){
 		t_now = ktime_get_ns();
@@ -58,46 +59,40 @@ int busy_pwm_loop(void* data) {
 			ps = &sw_pwms[ch];
 
 			diff = (t_now >= ps->t_event) ? t_now - ps->t_event : ps->t_event - t_now;
-			if(diff <= TOLERANCE) {
-			//if(ps->t_event <= t_now) {
+			log_diff = t_now - ps->t_event;
+			if(ps->t_event <= t_now) {
 				ps->on = !ps->on;
 				if(ps->on){
-					//gpio__set(ps->pin);
+					gpio__set(ps->pin);
 					// Changing interval at the end of period.
+						
 					spin_lock_irqsave(&ps->d_pending_lock, flags);
 					ps->d_on = ps->d_on_pending;
 					ps->d_off = ps->d_off_pending;
 					spin_unlock_irqrestore(&ps->d_pending_lock, flags);
+						
 
 					ps->t_event += ps->d_on;
 				}else{
-					//gpio__clear(ps->pin);
+					gpio__clear(ps->pin);
 					ps->t_event += ps->d_off;
 				}
 			} else {
-				ps->t_event += diff;
+				ps->t_event += (ps->on ? ps->d_on : ps->d_off) - diff;
 			}
+
 
 			if(ps->t_event < t_next){
 				t_next = ps->t_event;
 			}
 
-			if(ch == 0) {
-				if(diff <= TOLERANCE) 
-					printk(KERN_INFO DEV_NAME": diff: %llu t_now: %llu t_next: %llu", diff, ktime_get_ns()/SCALE, t_next/SCALE);
-				else 
-					printk(KERN_ALERT DEV_NAME": diff: %llu t_now: %llu t_next: %llu", diff, ktime_get_ns()/SCALE, t_next/SCALE);
-				log__add(diff, ps->on);
-			}
-
-
+			log__add(log_diff, ps->on, ch);
 		}
 		
 		if(t_next > (t_now + 1000)){
-			d_sleep = t_next - (t_now + 1000); // 1us safety.
-			printk(KERN_INFO DEV_NAME": sleeping for %llu", d_sleep);
+			d_sleep = (t_next - (t_now + 1000)) / 1000; // 1us safety.
 			if(d_sleep > 1000){
-				ndelay(d_sleep);
+				udelay(d_sleep);
 			}
 		}
 	}
@@ -131,8 +126,8 @@ int sw_pwm__init(void) {
 		ps = &sw_pwms[ch];
 
 		ps->pin = pins[ch];
-		//gpio__clear(ps->pin);
-		//gpio__steer_pinmux(ps->pin, GPIO__OUT);
+		gpio__clear(ps->pin);
+		gpio__steer_pinmux(ps->pin, GPIO__OUT);
 
 		ps->on = false;
 

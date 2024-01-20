@@ -120,7 +120,8 @@ static enum hrtimer_restart timer_callback(struct hrtimer* p_timer) {
 		ps->off_interval = ps->off_interval_pending;
 		spin_unlock_irqrestore(&ps->interval_pending_lock, flags);
 	}
-    log__add(ktime_get_ns(), ps->on, 0);
+    log__add(ktime_get_ns(), ps->on);
+	printk(KERN_INFO DEV_NAME": %llu %d", ktime_get_ns()/1000000, ps->on);
 
 	return HRTIMER_RESTART;
 }
