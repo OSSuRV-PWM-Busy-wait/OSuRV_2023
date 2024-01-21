@@ -46,8 +46,7 @@ int busy_pwm_loop(void* data) {
 	ns_t t_next;
 	ns_t d_sleep;
 	(void) data;
-	ns_t diff;
-	int64_t log_diff;
+	int64_t diff;
 
 	while(!kthread_should_stop()){
 		t_now = ktime_get_ns();
@@ -58,8 +57,7 @@ int busy_pwm_loop(void* data) {
 		for(ch = 0; ch < SW_PWM__N_CH; ch++){
 			ps = &sw_pwms[ch];
 
-			diff = (t_now >= ps->t_event) ? t_now - ps->t_event : ps->t_event - t_now;
-			log_diff = t_now - ps->t_event;
+			diff = t_now - ps->t_event;
 			if(ps->t_event <= t_now) {
 				ps->on = !ps->on;
 				if(ps->on){
@@ -71,14 +69,13 @@ int busy_pwm_loop(void* data) {
 					ps->d_off = ps->d_off_pending;
 					spin_unlock_irqrestore(&ps->d_pending_lock, flags);
 						
-
 					ps->t_event += ps->d_on;
 				}else{
 					gpio__clear(ps->pin);
 					ps->t_event += ps->d_off;
 				}
 			} else {
-				ps->t_event += (ps->on ? ps->d_on : ps->d_off) - diff;
+				ps->t_event += (ps->on ? ps->d_on : ps->d_off) + diff;
 			}
 
 
@@ -86,13 +83,13 @@ int busy_pwm_loop(void* data) {
 				t_next = ps->t_event;
 			}
 
-			log__add(log_diff, ps->on, ch);
+			log__add(diff, ps->on, ch);
 		}
 		
 		if(t_next > (t_now + 1000)){
-			d_sleep = (t_next - (t_now + 1000)) / 1000; // 1us safety.
+			d_sleep = t_next - (t_now + 1000); // 1us safety.
 			if(d_sleep > 1000){
-				udelay(d_sleep);
+				udelay(d_sleep / 1000);
 			}
 		}
 	}
