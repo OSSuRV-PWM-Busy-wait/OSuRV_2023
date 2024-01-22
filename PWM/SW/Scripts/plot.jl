@@ -15,10 +15,10 @@ open("/proc/motor_ctrl_log") do io
     end
 end
 
-p1 = plot(jitters, label="Jitter", linewidth=2)
+p1 = plot(jitters, label="Jitter", formatter=:plain, linewidth=2)
 fit_distribution = fit(Normal{Int}, convert.(Int, jitters))
 p2 = histogram(jitters, label="Jitters[ns]", alpha=0.5, normed=true)
-plot!(p2, fit_distribution, label="Fitted Normal Distribution")
+plot!(p2, fit_distribution, formatter=:plain, label="Fitted Normal Distribution")
 
 combined_plot = plot(p1, p2, layout=(2, 1))
 display(combined_plot)

@@ -32,7 +32,7 @@ while true
 
     fit_distribution = fit(Normal{Float64}, jitters)
     p2 = histogram(jitters, label="Jitters", alpha=0.5, normed=true, formatter=:plain)
-    plot!(p2, fit_distribution, label="Fitted Normal Distribution", xlabel="Microseconds", ylabel="Frequency", title="Normal Distribution", xticks=minimum(jitters):2:maximum(jitters))
+    plot!(p2, fit_distribution, label="Fitted Normal Distribution", xlabel="Microseconds", ylabel="Frequency", title="Normal Distribution")
 
     combined_plot = plot(p1, p2, layout=(2, 1))
     display(combined_plot)
