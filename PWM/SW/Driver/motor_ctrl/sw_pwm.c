@@ -8,6 +8,7 @@
 #include <linux/delay.h> // mdelay()
 #include <linux/errno.h> // ENOMEM
 #include <linux/kthread.h> // kthread stuff
+#include <linux/math64.h>
 
 static const uint8_t pins[SW_PWM__N_CH] = {
 	16,
@@ -89,7 +90,7 @@ int busy_pwm_loop(void* data) {
 		if(t_next > (t_now + 1000)){
 			d_sleep = t_next - (t_now + 1000); // 1us safety.
 			if(d_sleep > 1000){
-				udelay(d_sleep >> 10);
+				udelay(div_u64(d_sleep, 1000));
 			}
 		}
 	}
