@@ -89,7 +89,7 @@ int busy_pwm_loop(void* data) {
 		if(t_next > (t_now + 1000)){
 			d_sleep = t_next - (t_now + 1000); // 1us safety.
 			if(d_sleep > 1000){
-				udelay(d_sleep / 1000);
+				udelay(d_sleep >> 10);
 			}
 		}
 	}
