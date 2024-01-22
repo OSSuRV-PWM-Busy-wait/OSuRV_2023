@@ -34,9 +34,7 @@ typedef struct {
 } sw_pwm_t;
 static sw_pwm_t sw_pwms[SW_PWM__N_CH];
 
-//TODO ns_to_tijks();
-#define TOLERANCE 500000 // 0.5ms
-#define SCALE 1000000
+#define TOLERANCE -1500
 
 static struct task_struct* thread;
 int busy_pwm_loop(void* data) {
@@ -76,6 +74,7 @@ int busy_pwm_loop(void* data) {
 					ps->t_event += ps->d_off;
 				}
 			} else {
+				if(diff >= TOLERANCE) ps->on = !ps->on;
 				ps->t_event += (ps->on ? ps->d_on : ps->d_off) + diff;
 			}
 
